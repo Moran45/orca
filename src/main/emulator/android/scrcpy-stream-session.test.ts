@@ -215,6 +215,30 @@ describe('ScrcpyStreamSession control', () => {
     expect(session.sendControl(message)).toBe(false)
     expect(control.write).toHaveBeenCalledTimes(1)
   })
+
+  it('closes the session when its control socket ends', async () => {
+    const { video, control, server, callbacks, started } = await startSession()
+    video.emit('data', handshake())
+    const session = await started
+
+    control.emit('close')
+
+    expect(session.sendControl(Buffer.from([2]))).toBe(false)
+    expect(server.kill).toHaveBeenCalledTimes(1)
+    expect(callbacks.onClose).toHaveBeenCalledTimes(1)
+    expect(callbacks.onError).not.toHaveBeenCalled()
+  })
+
+  it('fails startup when the control socket ends before the video metadata', async () => {
+    const { video, control, callbacks, started } = await startSession()
+    video.emit('data', handshake().subarray(0, 1))
+
+    control.emit('close')
+
+    await expect(started).rejects.toThrow(/control socket closed/)
+    expect(callbacks.onError).toHaveBeenCalledTimes(1)
+    expect(callbacks.onClose).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('ScrcpyStreamSession teardown', () => {

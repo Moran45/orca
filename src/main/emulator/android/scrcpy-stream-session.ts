@@ -199,10 +199,17 @@ export class ScrcpyStreamSession implements ScrcpyControlTarget {
     socket.on('error', (error) =>
       emulatorProbeError('scrcpy.control.fail', error, { serial: this.options.serial })
     )
+    // A v2.4 server stops its video once control ends; end the session too so input falls back to adb.
     socket.on('close', () => {
-      if (this.controlSocket === socket) {
-        this.controlSocket = null
+      if (this.controlSocket !== socket) {
+        return
       }
+      this.controlSocket = null
+      if (!this.metaSeen) {
+        this.fail('scrcpy control socket closed before the video stream started')
+        return
+      }
+      this.close()
     })
     this.controlSocket = socket
   }
